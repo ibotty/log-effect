@@ -13,9 +13,9 @@ module Control.Eff.Log
   , logLine
   , logE
   , filterLog
-  , runLog
+  , runPureLog
   , runLogStdErr
-  , runLogM
+  , runLog
   ) where
 
 import Control.Applicative ((<$>))
@@ -38,14 +38,17 @@ class ShowLog l where
 instance ShowLog String where
     showLog s = s
 
+-- | a monadic action that does the real logging
+type Logger m l = forall v. Log l v -> m ()
+
 logE :: (Typeable l, SetMember Log (Log l) r)
   => l -> Eff r ()
 logE line = send $ \next -> inj (Log line (next ()))
 
-runLog :: (Typeable l)
+runPureLog :: (Typeable l)
   => Eff (Log l :> r) a
   -> Eff r (a, [l])
-runLog = go . admin
+runPureLog = go . admin
   where go (Val v) = return (v, [])
         go (E req) = handleRelay req go performLog
         performLog l = fmap (prefixLogWith l) (go (logNext l))
@@ -53,11 +56,14 @@ runLog = go . admin
 
 runLogStdErr :: (Typeable l, ShowLog l, SetMember Lift (Lift IO) r)
   => Eff (Log l :> r) a -> Eff r a
-runLogStdErr = runLogM (hPutStrLn stderr . showLog . logLine)
+runLogStdErr = runLog stdErrLogger
 
-runLogM :: (Typeable l, Typeable1 m, SetMember Lift (Lift m) r)
-  => (forall v. Log l v -> m ()) -> Eff (Log l :> r) a -> Eff r a
-runLogM logger = go . admin
+stdErrLogger :: ShowLog l => Logger IO l
+stdErrLogger = hPutStrLn stderr . showLog . logLine
+
+runLog :: (Typeable l, Typeable1 m, SetMember Lift (Lift m) r)
+  => Logger m l -> Eff (Log l :> r) a -> Eff r a
+runLog logger = go . admin
   where go (Val v) = return v
         go (E req) = handleRelay req go performLog
         performLog l = lift (logger l) >> go (logNext l)
