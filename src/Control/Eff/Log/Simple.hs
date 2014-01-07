@@ -1,14 +1,13 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
 module Control.Eff.Log.Simple
   ( SimpleLog
   , Severity(..)
-  , runSimpleLog
-  , runSimpleLogStdErr
-  , showSimpleLog
+  , logTo
   , debug
   , info
   , notice
@@ -20,46 +19,42 @@ module Control.Eff.Log.Simple
   ) where
 
 import Prelude hiding (error)
-import Control.Eff (Eff, Member, SetMember, (:>))
-import Control.Eff.Lift (Lift)
+import Control.Eff (Eff, SetMember)
 import Control.Eff.Log
 import Data.Typeable (Typeable)
 
 data Severity = DEBUG | INFO | NOTICE | WARNING | ERROR | CRITICAL | ALERT | PANIC
   deriving (Bounded, Enum, Eq, Ord, Read, Show, Typeable)
 
-debug :: Member SimpleLog r => String -> Eff r ()
+logTo :: (Typeable l, SetMember Log (Log (Severity, l)) r)
+  => Severity -> l -> Eff r ()
+logTo sev line = logE (sev, line)
+
+debug :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
 debug = logTo DEBUG
 
-info :: Member SimpleLog r => String -> Eff r ()
+info :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
 info = logTo INFO
 
-notice :: Member SimpleLog r => String -> Eff r ()
+notice :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
 notice = logTo NOTICE
 
-warning :: Member SimpleLog r => String -> Eff r ()
+warning :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
 warning = logTo WARNING
 
-error :: Member SimpleLog r => String -> Eff r ()
+error :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
 error = logTo ERROR
 
-critical :: Member SimpleLog r => String -> Eff r ()
+critical :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
 critical = logTo CRITICAL
 
-alert :: Member SimpleLog r => String -> Eff r ()
+alert :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
 alert = logTo ALERT
 
-panic :: Member SimpleLog r => String -> Eff r ()
+panic :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
 panic = logTo PANIC
 
-type SimpleLog = Log Severity String
+type SimpleLog = Log (Severity, String)
 
-runSimpleLog :: Member SimpleLog r => Eff (SimpleLog :> r) a -> Eff r (a, [String])
-runSimpleLog = runLog showSimpleLog
-
-runSimpleLogStdErr :: (SetMember Lift (Lift IO) r, Member SimpleLog r) =>
-    Eff (SimpleLog :> r) a -> Eff r a
-runSimpleLogStdErr = runLogStdErr showSimpleLog
-
-showSimpleLog :: SimpleLog v -> String
-showSimpleLog (Log sev line _) = "[" ++ show sev ++ "] " ++ line
+instance ShowLog a => ShowLog (Severity, a) where
+    showLog (sev, line) = "[" ++ show sev ++ "] " ++ showLog line
