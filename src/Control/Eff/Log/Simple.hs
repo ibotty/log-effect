@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Control.Eff.Log.Simple
   ( SimpleLog
   , Severity(..)
@@ -21,7 +22,9 @@ module Control.Eff.Log.Simple
 import Prelude hiding (error)
 import Control.Eff (Eff, SetMember)
 import Control.Eff.Log
+import Data.Monoid ((<>))
 import Data.Typeable (Typeable)
+import System.Log.FastLogger (toLogStr)
 
 data Severity = DEBUG | INFO | NOTICE | WARNING | ERROR | CRITICAL | ALERT | PANIC
   deriving (Bounded, Enum, Eq, Ord, Read, Show, Typeable)
@@ -54,7 +57,7 @@ alert = logTo ALERT
 panic :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
 panic = logTo PANIC
 
-type SimpleLog = Log (Severity, String)
+type SimpleLog a = Log (Severity, a)
 
 instance ShowLog a => ShowLog (Severity, a) where
-    showLog (sev, line) = "[" ++ show sev ++ "] " ++ showLog line
+    showLog (sev, line) = "[" <> toLogStr (show sev) <> "] " <> showLog line

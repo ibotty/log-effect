@@ -15,6 +15,7 @@ module Control.Eff.Log
   , filterLog
   , runPureLog
   , runLogStdErr
+  , runLogFile
   , runLog
   ) where
 
@@ -23,7 +24,9 @@ import Control.Eff ( Eff, SetMember, VE(..), (:>)
                    , admin, handleRelay, inj, interpose, send)
 import Control.Eff.Lift (Lift, lift)
 import Data.Typeable (Typeable, Typeable1)
-import System.IO (hPutStrLn, stderr)
+import System.IO (stderr)
+import System.Log.FastLogger (LoggerSet, LogStr, defaultBufSize, fromLogStr, newLoggerSet, pushLogStr, toLogStr)
+import qualified Data.ByteString.Char8 as B8
 
 data Log a v = Log
   { logLine :: a
@@ -33,10 +36,10 @@ data Log a v = Log
 instance SetMember Log (Log m) (Log m :> a)
 
 class ShowLog l where
-    showLog :: l -> String
+    showLog :: l -> LogStr
 
 instance ShowLog String where
-    showLog s = s
+    showLog = toLogStr
 
 -- | a monadic action that does the real logging
 type Logger m l = forall v. Log l v -> m ()
@@ -54,13 +57,6 @@ runPureLog = go . admin
         performLog l = fmap (prefixLogWith l) (go (logNext l))
         prefixLogWith log' (v, l) = (v, logLine log' : l)
 
-runLogStdErr :: (Typeable l, ShowLog l, SetMember Lift (Lift IO) r)
-  => Eff (Log l :> r) a -> Eff r a
-runLogStdErr = runLog stdErrLogger
-
-stdErrLogger :: ShowLog l => Logger IO l
-stdErrLogger = hPutStrLn stderr . showLog . logLine
-
 runLog :: (Typeable l, Typeable1 m, SetMember Lift (Lift m) r)
   => Logger m l -> Eff (Log l :> r) a -> Eff r a
 runLog logger = go . admin
@@ -75,3 +71,24 @@ filterLog f = go . admin
         go (E req) = interpose req go filter'
           where filter' (Log l v) = if f l then send (<$> req) >>= go
                                            else go v
+runLogStdErr :: (Typeable l, ShowLog l, SetMember Lift (Lift IO) r)
+  => Eff (Log l :> r) a -> Eff r a
+runLogStdErr = runLog stdErrLogger
+
+stdErrLogger :: ShowLog l => Logger IO l
+stdErrLogger = B8.hPutStrLn stderr . fromLogStr . showLog . logLine
+
+-- | Log to file.
+runLogFile :: (Typeable l, ShowLog l, SetMember Lift (Lift IO) r)
+  => FilePath -> Eff (Log l :> r) a -> Eff r a
+runLogFile f eff = do
+    s <- lift (newLoggerSet defaultBufSize (Just f))
+    runLogWithLoggerSet s eff
+
+-- | Log to a file using a 'LoggerSet'.
+runLogWithLoggerSet :: (Typeable l, ShowLog l, SetMember Lift (Lift IO) r)
+  => LoggerSet -> Eff (Log l :> r) a -> Eff r a
+runLogWithLoggerSet s = runLog (fileLogger s)
+
+fileLogger :: ShowLog l => LoggerSet -> Logger IO l
+fileLogger loggerSet = pushLogStr loggerSet . showLog . logLine
