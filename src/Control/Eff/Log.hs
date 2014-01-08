@@ -13,7 +13,7 @@ module Control.Eff.Log
   , logLine
   , logE
   , filterLog
-  , runPureLog
+  , runLogPure
   , runLogStdErr
   , runLogFile
   , runLog
@@ -48,10 +48,10 @@ logE :: (Typeable l, SetMember Log (Log l) r)
   => l -> Eff r ()
 logE line = send $ \next -> inj (Log line (next ()))
 
-runPureLog :: (Typeable l)
+runLogPure :: (Typeable l)
   => Eff (Log l :> r) a
   -> Eff r (a, [l])
-runPureLog = go . admin
+runLogPure = go . admin
   where go (Val v) = return (v, [])
         go (E req) = handleRelay req go performLog
         performLog l = fmap (prefixLogWith l) (go (logNext l))
