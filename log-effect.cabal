@@ -2,11 +2,11 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                log-effect
-version:             0.2.0.0
+version:             0.2.0.1
 synopsis:            An extensible log effect using extensible-effects
 description:         Any help (especially documentation) is very welcome,
 homepage:            https://github.com/ibotty/log-effect
-license:             BSD2
+license:             MIT
 license-file:        LICENSE
 author:              Tobias Florek
 maintainer:          tob@butter.sh
