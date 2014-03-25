@@ -7,10 +7,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 module Control.Eff.Log
-  ( Log(Log)
-  , ShowLog
-  , showLog
-  , logLine
+  ( Log(Log, logLine)
+  , ShowLog(showLog)
   , logE
   , filterLog
   , runLogPure
