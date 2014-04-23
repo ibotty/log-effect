@@ -2,6 +2,12 @@
 # NB: don't set `language: haskell` here
 # See https://github.com/hvr/multi-ghc-travis for more information
  
+notifications:
+  email:
+    - ibotty+travis@ibotty.net
+  on_success: never
+  on_failure: always
+
 env:
  - GHCVER=7.6.1
  - GHCVER=7.6.2
