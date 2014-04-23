@@ -1,6 +1,7 @@
+---
 # NB: don't set `language: haskell` here
 # See https://github.com/hvr/multi-ghc-travis for more information
-
+ 
 env:
  - GHCVER=7.6.1
  - GHCVER=7.6.2
