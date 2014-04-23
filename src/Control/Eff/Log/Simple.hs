@@ -20,7 +20,7 @@ module Control.Eff.Log.Simple
   ) where
 
 import Prelude hiding (error)
-import Control.Eff (Eff, SetMember)
+import Control.Eff (Eff, Member)
 import Control.Eff.Log
 import Data.Monoid ((<>))
 import Data.Typeable (Typeable)
@@ -29,32 +29,32 @@ import System.Log.FastLogger (toLogStr)
 data Severity = DEBUG | INFO | NOTICE | WARNING | ERROR | CRITICAL | ALERT | PANIC
   deriving (Bounded, Enum, Eq, Ord, Read, Show, Typeable)
 
-logTo :: (Typeable l, SetMember Log (Log (Severity, l)) r)
+logTo :: (Typeable l, Member (Log (Severity, l)) r)
   => Severity -> l -> Eff r ()
 logTo sev line = logE (sev, line)
 
-debug :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
+debug :: (Typeable l, Member (Log (Severity, l)) r) => l -> Eff r ()
 debug = logTo DEBUG
 
-info :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
+info :: (Typeable l, Member (Log (Severity, l)) r) => l -> Eff r ()
 info = logTo INFO
 
-notice :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
+notice :: (Typeable l, Member (Log (Severity, l)) r) => l -> Eff r ()
 notice = logTo NOTICE
 
-warning :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
+warning :: (Typeable l, Member (Log (Severity, l)) r) => l -> Eff r ()
 warning = logTo WARNING
 
-error :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
+error :: (Typeable l, Member (Log (Severity, l)) r) => l -> Eff r ()
 error = logTo ERROR
 
-critical :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
+critical :: (Typeable l, Member (Log (Severity, l)) r) => l -> Eff r ()
 critical = logTo CRITICAL
 
-alert :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
+alert :: (Typeable l, Member (Log (Severity, l)) r) => l -> Eff r ()
 alert = logTo ALERT
 
-panic :: (Typeable l, SetMember Log (Log (Severity, l)) r) => l -> Eff r ()
+panic :: (Typeable l, Member (Log (Severity, l)) r) => l -> Eff r ()
 panic = logTo PANIC
 
 type SimpleLog a = Log (Severity, a)

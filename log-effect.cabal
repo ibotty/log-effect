@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                log-effect
-version:             0.2.0.1
+version:             0.3.0
 synopsis:            An extensible log effect using extensible-effects
 description:         Any help (especially documentation) is very welcome,
 homepage:            https://github.com/ibotty/log-effect
@@ -23,7 +23,7 @@ library
   -- other-extensions:    
   build-depends:       base >=4.6 && <4.7
                      , bytestring >=0.10.2 && <0.11
-                     , extensible-effects >=1.2 && <1.3
+                     , extensible-effects >=1.4 && <1.6
                      , fast-logger >=2.1 && <2.2
                      , time >=1.4 && <1.5
   hs-source-dirs:      src
