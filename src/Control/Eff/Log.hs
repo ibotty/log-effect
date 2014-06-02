@@ -56,7 +56,7 @@ runLogPure = go . admin
         performLog l = fmap (prefixLogWith l) (go (logNext l))
         prefixLogWith log' (v, l) = (v, logLine log' : l)
 
-runLog :: (Typeable l, Typeable1 m, Member (Lift m) r)
+runLog :: (Typeable l, Typeable1 m, SetMember Lift (Lift m) r)
   => Logger m l -> Eff (Log l :> r) a -> Eff r a
 runLog logger = go . admin
   where go (Val v) = return v
@@ -70,7 +70,7 @@ filterLog f = go . admin
         go (E req) = interpose req go filter'
           where filter' (Log l v) = if f l then send (<$> req) >>= go
                                            else go v
-runLogStdErr :: (Typeable l, ShowLog l, Member (Lift IO) r)
+runLogStdErr :: (Typeable l, ShowLog l, SetMember Lift (Lift IO) r)
   => Eff (Log l :> r) a -> Eff r a
 runLogStdErr = runLog stdErrLogger
 
@@ -78,14 +78,14 @@ stdErrLogger :: ShowLog l => Logger IO l
 stdErrLogger = B8.hPutStrLn stderr . fromLogStr . showLog . logLine
 
 -- | Log to file.
-runLogFile :: (Typeable l, ShowLog l, Member (Lift IO) r)
+runLogFile :: (Typeable l, ShowLog l, SetMember Lift (Lift IO) r)
   => FilePath -> Eff (Log l :> r) a -> Eff r a
 runLogFile f eff = do
     s <- lift (newLoggerSet defaultBufSize (Just f))
     runLogWithLoggerSet s eff
 
 -- | Log to a file using a 'LoggerSet'.
-runLogWithLoggerSet :: (Typeable l, ShowLog l, Member (Lift IO) r)
+runLogWithLoggerSet :: (Typeable l, ShowLog l, SetMember Lift (Lift IO) r)
   => LoggerSet -> Eff (Log l :> r) a -> Eff r a
 runLogWithLoggerSet s = runLog (fileLogger s)
 
