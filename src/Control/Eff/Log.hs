@@ -32,8 +32,6 @@ data Log a v = Log
   , logNext :: v
   } deriving (Typeable, Functor)
 
-instance Member (Log m) r => SetMember Log (Log m) r
-
 class ShowLog l where
     showLog :: l -> LogStr
 
