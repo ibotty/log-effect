@@ -17,6 +17,9 @@ module Control.Eff.Log
   , runLogFile
   , runLogWithLoggerSet
   , runLog
+  -- | reexports from fast-logger
+  , ToLogStr(toLogStr)
+  , LogStr
   ) where
 
 import Control.Applicative   ((<$>), (<*))
