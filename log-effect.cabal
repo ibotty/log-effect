@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                log-effect
-version:             0.4.0.0
+version:             0.4.0.1
 synopsis:            An extensible log effect using extensible-effects
 description:         Any help (especially documentation) is very welcome,
 homepage:            https://github.com/ibotty/log-effect
@@ -13,7 +13,8 @@ maintainer:          tob@butter.sh
 -- copyright:           
 category:            Control, Effect, Logging
 build-type:          Simple
--- extra-source-files:  
+extra-source-files:    Changelog.md
+                     , examples/IOLogger.hs
 cabal-version:       >=1.10
 
 library

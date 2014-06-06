@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeOperators         #-}
 module Control.Eff.Log
   ( Log(Log, logLine)
+  , Logger
   , logE
   , filterLog
   , filterLog'
@@ -39,10 +40,12 @@ data Log a v = Log
 -- | a monadic action that does the real logging
 type Logger m l = forall v. Log l v -> m ()
 
+-- | Log something.
 logE :: (Typeable l, Member (Log l) r)
   => l -> Eff r ()
 logE line = send $ \next -> inj (Log line (next ()))
 
+-- | Collect log messages in a list.
 runLogPure :: (Typeable l)
   => Eff (Log l :> r) a
   -> Eff r (a, [l])
@@ -52,6 +55,7 @@ runLogPure = go . admin
         performLog l = fmap (prefixLogWith l) (go (logNext l))
         prefixLogWith log' (v, l) = (v, logLine log' : l)
 
+-- | Run the 'Logger' action in the base monad for every log line.
 runLog :: (Typeable l, Typeable1 m, SetMember Lift (Lift m) r)
   => Logger m l -> Eff (Log l :> r) a -> Eff r a
 runLog logger = go . admin
@@ -73,7 +77,7 @@ filterLog f = go . admin
 
 -- | Filter Log entries with a predicate and a proxy.
 --
--- This is the same as 'filterLog' but with a "proxy l" for type inference.
+-- This is the same as 'filterLog' but with a proxy l for type inference.
 filterLog' :: (Typeable l, Member (Log l) r)
   => (l -> Bool) -> proxy l -> Eff r a -> Eff r a
 filterLog' predicate _ = filterLog predicate
