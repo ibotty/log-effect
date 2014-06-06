@@ -1,9 +1,10 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TypeOperators         #-}
 module Control.Eff.Log.Simple
   ( SimpleLog
   , Severity(..)
@@ -18,15 +19,31 @@ module Control.Eff.Log.Simple
   , panic
   ) where
 
-import Prelude hiding (error)
-import Control.Eff (Eff, Member)
+import Control.Eff           (Eff, Member)
 import Control.Eff.Log
-import Data.Monoid ((<>))
-import Data.Typeable (Typeable)
-import System.Log.FastLogger (toLogStr)
+import Data.Monoid           ((<>))
+import Data.Typeable         (Typeable)
+import Prelude               hiding (error)
+import System.Log.FastLogger (ToLogStr, toLogStr)
 
-data Severity = DEBUG | INFO | NOTICE | WARNING | ERROR | CRITICAL | ALERT | PANIC
+data Severity =
+    DEBUG | INFO | NOTICE | WARNING | ERROR | CRITICAL | ALERT | PANIC
   deriving (Bounded, Enum, Eq, Ord, Read, Show, Typeable)
+
+type SimpleLog a = Log (Severity, a)
+
+instance ToLogStr Severity where
+    toLogStr DEBUG    = "DEBUG"
+    toLogStr INFO     = "INFO"
+    toLogStr NOTICE   = "NOTICE"
+    toLogStr WARNING  = "WARNING"
+    toLogStr ERROR    = "ERROR"
+    toLogStr CRITICAL = "CRITICAL"
+    toLogStr ALERT    = "ALERT"
+    toLogStr PANIC    = "PANIC"
+
+instance ToLogStr a => ToLogStr (Severity, a) where
+    toLogStr (sev, line) = "[" <> toLogStr sev <> "] " <> toLogStr line <> "\n"
 
 logTo :: (Typeable l, Member (Log (Severity, l)) r)
   => Severity -> l -> Eff r ()
@@ -55,8 +72,3 @@ alert = logTo ALERT
 
 panic :: (Typeable l, Member (Log (Severity, l)) r) => l -> Eff r ()
 panic = logTo PANIC
-
-type SimpleLog a = Log (Severity, a)
-
-instance ShowLog a => ShowLog (Severity, a) where
-    showLog (sev, line) = "[" <> toLogStr (show sev) <> "] " <> showLog line

@@ -1,42 +1,40 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveDataTypeable    #-}
+{-# LANGUAGE DeriveFunctor         #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TypeOperators         #-}
 module Control.Eff.Log
   ( Log(Log, logLine)
-  , ShowLog(showLog)
   , logE
   , filterLog
+  , filterLog'
   , runLogPure
-  , runLogStdErr
+  , runLogStdout
+  , runLogStderr
   , runLogFile
+  , runLogWithLoggerSet
   , runLog
   ) where
 
-import Control.Applicative ((<$>))
-import Control.Eff ( Eff, Member, SetMember, VE(..), (:>)
-                   , admin, handleRelay, inj, interpose, send)
-import Control.Eff.Lift (Lift, lift)
-import Data.Typeable (Typeable, Typeable1)
-import System.IO (stderr)
-import System.Log.FastLogger (LoggerSet, LogStr, defaultBufSize, fromLogStr, newLoggerSet, pushLogStr, toLogStr)
+import Control.Applicative   ((<$>), (<*))
+import Control.Eff           ((:>), Eff, Member, SetMember, VE (..), admin,
+                              handleRelay, inj, interpose, send)
+import Control.Eff.Lift      (Lift, lift)
+import Data.Monoid           ((<>))
+import Data.Typeable         (Typeable, Typeable1)
+import System.Log.FastLogger (LogStr, LoggerSet, ToLogStr, defaultBufSize,
+                              flushLogStr, fromLogStr, newFileLoggerSet,
+                              newStderrLoggerSet, newStdoutLoggerSet,
+                              pushLogStr, toLogStr)
+
 import qualified Data.ByteString.Char8 as B8
 
 data Log a v = Log
   { logLine :: a
   , logNext :: v
   } deriving (Typeable, Functor)
-
-class ShowLog l where
-    showLog :: l -> LogStr
-
-instance ShowLog String where
-    showLog = toLogStr
 
 -- | a monadic action that does the real logging
 type Logger m l = forall v. Log l v -> m ()
@@ -61,6 +59,10 @@ runLog logger = go . admin
         go (E req) = handleRelay req go performLog
         performLog l = lift (logger l) >> go (logNext l)
 
+-- | Filter Log entries with a predicate.
+--
+-- Note that, most of the time an explicit type signature for the predicate
+-- will be required.
 filterLog :: (Typeable l, Member (Log l) r)
   => (l -> Bool) -> Eff r a -> Eff r a
 filterLog f = go . admin
@@ -68,24 +70,55 @@ filterLog f = go . admin
         go (E req) = interpose req go filter'
           where filter' (Log l v) = if f l then send (<$> req) >>= go
                                            else go v
-runLogStdErr :: (Typeable l, ShowLog l, SetMember Lift (Lift IO) r)
-  => Eff (Log l :> r) a -> Eff r a
-runLogStdErr = runLog stdErrLogger
 
-stdErrLogger :: ShowLog l => Logger IO l
-stdErrLogger = B8.hPutStrLn stderr . fromLogStr . showLog . logLine
+-- | Filter Log entries with a predicate and a proxy.
+--
+-- This is the same as 'filterLog' but with a "proxy l" for type inference.
+filterLog' :: (Typeable l, Member (Log l) r)
+  => (l -> Bool) -> proxy l -> Eff r a -> Eff r a
+filterLog' predicate _ = filterLog predicate
+
+-- | Log to stdout.
+runLogStdout :: (Typeable l, ToLogStr l, SetMember Lift (Lift IO) r)
+  => proxy l -> Eff (Log l :> r) a -> Eff r a
+runLogStdout proxy eff = do
+    s <- lift $ newStdoutLoggerSet defaultBufSize
+    runLogWithLoggerSet s proxy eff <* lift (flushLogStr s)
+
+-- | Log to stderr.
+runLogStderr :: (Typeable l, ToLogStr l, SetMember Lift (Lift IO) r)
+  => proxy l -> Eff (Log l :> r) a -> Eff r a
+runLogStderr proxy eff = do
+    s <- lift $ newStderrLoggerSet defaultBufSize
+    runLogWithLoggerSet s proxy eff <* lift (flushLogStr s)
 
 -- | Log to file.
-runLogFile :: (Typeable l, ShowLog l, SetMember Lift (Lift IO) r)
-  => FilePath -> Eff (Log l :> r) a -> Eff r a
-runLogFile f eff = do
-    s <- lift (newLoggerSet defaultBufSize (Just f))
-    runLogWithLoggerSet s eff
+runLogFile :: (Typeable l, ToLogStr l, SetMember Lift (Lift IO) r)
+  => FilePath -> proxy l -> Eff (Log l :> r) a -> Eff r a
+runLogFile f proxy eff = do
+    s <- lift $ newFileLoggerSet defaultBufSize f
+    runLogWithLoggerSet s proxy eff <* lift (flushLogStr s)
 
 -- | Log to a file using a 'LoggerSet'.
-runLogWithLoggerSet :: (Typeable l, ShowLog l, SetMember Lift (Lift IO) r)
-  => LoggerSet -> Eff (Log l :> r) a -> Eff r a
-runLogWithLoggerSet s = runLog (fileLogger s)
+--
+-- Note, that you will still have to call 'flushLogStr' on the 'LoggerSet'
+-- at one point.
+--
+-- With that function you can combine a logger in a surrounding IO action
+-- with a logger in the 'Eff' effect.
+--
+-- >data Proxy a = Proxy
+-- >
+-- > main :: IO ()
+-- > main = do
+-- >     loggerSet <- newStderrLoggerSet defaultBufSize
+-- >     pushLogStr loggerSet "logging from outer space^WIO\n"
+-- >     runLift $ runLogWithLoggerSet loggerSet (Proxy :: Proxy String) $
+-- >         logE ("logging from within Eff" :: String)
+-- >     flushLogStr loggerSet
+runLogWithLoggerSet :: (Typeable l, ToLogStr l, SetMember Lift (Lift IO) r)
+  => LoggerSet -> proxy l -> Eff (Log l :> r) a -> Eff r a
+runLogWithLoggerSet s _ = runLog (loggerSetLogger s)
 
-fileLogger :: ShowLog l => LoggerSet -> Logger IO l
-fileLogger loggerSet = pushLogStr loggerSet . showLog . logLine
+loggerSetLogger :: ToLogStr l => LoggerSet -> Logger IO l
+loggerSetLogger loggerSet = pushLogStr loggerSet . (<> "\n") . toLogStr . logLine
